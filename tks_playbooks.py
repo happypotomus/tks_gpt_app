@@ -13,6 +13,9 @@ client = MongoClient("mongodb+srv://pranavmenon:Kceawhf6123...@serverlessinstanc
 db = client.gpt_playbook
 collection = db.playbook
 
+# Create a text index on the 'content' field for text search
+collection.create_index([("content", "text")])
+
 notion = Client(auth="secret_oElIIAJoGfU0lbUh8OEWfbFcXYhXWqRRYYYOL9xV8Zx")
 
 # Define a function to create unique identifiers based on the content
