@@ -1,8 +1,12 @@
 from notion_client import Client
 import re
 import json
-
 from pymongo import MongoClient
+import streamlit as st
+import openai
+
+# Set your OpenAI API key here
+openai.api_key = "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"
 
 # Replace with your actual connection string
 client = MongoClient("mongodb+srv://pranavmenon:Kceawhf6123...@serverlessinstance0.pgxo6w3.mongodb.net/?retryWrites=true&w=majority")
@@ -51,7 +55,34 @@ def extract_content_from_child_pages(parent_page_id):
 
     return all_text_content
 
+def query_mongodb(user_question):
+    # Implement your query logic here
+    responses = []
 
+    # Define a MongoDB query to find relevant documents
+    cursor = collection.find(
+        {"$text": {"$search": user_question}},
+        {"score": {"$meta": "textScore"}}
+    ).sort([("score", {"$meta": "textScore"})])
+
+    # Retrieve relevant responses and source information
+    for document in cursor:
+        response = {
+            "response_text": document.get("content", ""),
+            "source_info": document.get("source_info", "Source not available")
+        }
+        responses.append(response)
+
+    return responses
+
+def generate_gpt_response(user_question):
+    # Use OpenAI GPT-3 to generate a response
+    response = openai.Completion.create(
+        engine="text-davinci-002",
+        prompt=f"Answer the following question:\n{user_question}\nAnswer:",
+        max_tokens=50
+    )
+    return response.choices[0].text
 
 def update_mongodb(text_content):
     for item in text_content:
@@ -65,17 +96,25 @@ def update_mongodb(text_content):
         except Exception as e:
             print(f"Error updating MongoDB: {e}")
 
-# Main execution
-def main():
-    notion_webpage_url = "https://www.notion.so/Test-Page-2f7d41f4dba24d6aa6c1255bce0fec85?pvs=4"
-    parent_page_id = find_page_id_from_url(notion_webpage_url)
+# Streamlit app
+st.title("GPT-Powered Agent with MongoDB")
 
-    if parent_page_id:
-        text_content = extract_content_from_child_pages(parent_page_id)
-        print("Extracted Text Content:", "\n".join(text_content))
-        update_mongodb(text_content)
-    else:
-        print("Page ID not found.")
+# Input field for user question
+user_question = st.text_input("Ask a question:")
 
-if __name__ == "__main__":
-    main()
+if user_question:
+    # Query MongoDB with the user's question
+    responses = query_mongodb(user_question)
+    
+    st.header("Responses:")
+    
+    # Display responses with sources
+    for i, response in enumerate(responses, start=1):
+        st.subheader(f"Response {i}:")
+        st.write("Text:", response["response_text"])
+        st.write("Source:", response["source_info"])
+
+    # Generate a GPT response
+    gpt_response = generate_gpt_response(user_question)
+    st.header("GPT-Powered Response:")
+    st.write(gpt_response)
